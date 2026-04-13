@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eric vs Claude — Tease Tracker</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f2;color:#1a1a1a;font-size:15px}
+.app{max-width:780px;margin:0 auto;padding:1rem}
+header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid #e0e0d8}
+header h1{font-size:20px;font-weight:600}
+header p{font-size:13px;color:#888;margin-top:2px}
+.today{font-size:13px;color:#888}
+nav{display:flex;gap:6px;margin-bottom:1.5rem}
+nav button{padding:6px 16px;border-radius:8px;border:1px solid #d0d0c8;background:transparent;color:#444;cursor:pointer;font-size:14px;transition:background 0.15s}
+nav button.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.section{display:none}.section.active{display:block}
+.card{background:#fff;border:1px solid #e8e8e0;border-radius:12px;padding:1rem 1.25rem;margin-bottom:1rem}
+h3{font-size:15px;font-weight:600;margin-bottom:0.75rem}
+.metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:1.25rem}
+.metric{background:#f5f5f2;border-radius:8px;padding:0.875rem;text-align:center}
+.metric .lbl{font-size:11px;color:#888;margin-bottom:3px;text-transform:uppercase;letter-spacing:0.04em}
+.metric .val{font-size:22px;font-weight:600}
+.metric .sub{font-size:12px;color:#888;margin-top:1px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:8px 10px;color:#888;font-weight:500;border-bottom:1px solid #eee;font-size:12px;text-transform:uppercase;letter-spacing:0.03em}
+td{padding:9px 10px;border-bottom:1px solid #f0f0e8}
+tr:last-child td{border-bottom:none}
+.player-col{display:flex;align-items:center;gap:8px}
+.avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
+select,input{padding:7px 10px;border:1px solid #d8d8d0;border-radius:8px;background:#fff;color:#1a1a1a;font-size:14px;width:100%;outline:none;transition:border-color 0.15s}
+select:focus,input:focus{border-color:#888}
+.btn{padding:8px 18px;border-radius:8px;border:1px solid #d0d0c8;background:transparent;color:#1a1a1a;cursor:pointer;font-size:14px;font-weight:500;transition:all 0.15s}
+.btn:hover{background:#f0f0e8}
+.btn-primary{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.btn-primary:hover{background:#333}
+.leg-block{border:1px solid #e0e0d8;border-radius:10px;padding:12px;margin-bottom:10px;transition:border-color 0.15s}
+.leg-block.invalid{border-color:#e24b4a;background:#fff8f8}
+.leg-title{font-size:12px;color:#888;margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
+.leg-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.field-label{font-size:12px;color:#666;display:block;margin-bottom:4px}
+.result-btn{padding:4px 12px;border-radius:6px;border:1px solid #d8d8d0;cursor:pointer;font-size:12px;background:transparent;color:#888;transition:all 0.15s}
+.result-btn:hover{background:#f5f5f2}
+.result-btn.hit{background:#eaf3de;color:#27500a;border-color:#c0dd97}
+.result-btn.miss{background:#fcebeb;color:#501313;border-color:#f7c1c1}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
+.badge-win{background:#eaf3de;color:#27500a}
+.badge-loss{background:#fcebeb;color:#501313}
+.badge-dumbass{background:#faeeda;color:#633806}
+.badge-trifecta{background:#e1f5ee;color:#085041}
+.status-bar{font-size:12px;margin-top:10px;padding:8px 12px;border-radius:8px;background:#f5f5f2;color:#666;display:none}
+.status-bar.show{display:block}
+.status-bar.invalid{background:#fcebeb;color:#501313}
+.status-bar.trifecta{background:#e1f5ee;color:#085041}
+.chart-wrap{height:200px;position:relative;margin-top:0.5rem}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block}
+.dot-hit{background:#639922}.dot-miss{background:#e24b4a}.dot-pending{background:#bbb}
+.pick-leg{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:13px;color:#666}
+.loading{text-align:center;padding:2rem;color:#888;font-size:14px}
+.conn-status{font-size:11px;padding:3px 8px;border-radius:4px;margin-left:8px}
+.conn-ok{background:#eaf3de;color:#27500a}
+.conn-err{background:#fcebeb;color:#501313}
+@media(max-width:500px){
+  .leg-grid{grid-template-columns:1fr}
+  .metrics{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <div>
+    <h1>Eric vs Claude <span class="conn-status" id="conn-status">connecting…</span></h1>
+    <p>MLB tease tracker — 1.5 run teases, 3 legs</p>
+  </div>
+  <div class="today" id="today-label"></div>
+</header>
+
+<nav>
+  <button class="active" onclick="showSection('standings',this)">Standings</button>
+  <button onclick="showSection('picks',this)">Today's picks</button>
+  <button onclick="showSection('history',this)">History</button>
+</nav>
+
+<div id="standings" class="section active">
+  <div class="metrics" id="metrics-row">
+    <div class="metric"><div class="lbl">Leader</div><div class="val">—</div></div>
+    <div class="metric"><div class="lbl">Margin</div><div class="val">—</div></div>
+    <div class="metric"><div class="lbl">Days played</div><div class="val">—</div></div>
+  </div>
+  <div class="card">
+    <h3>Season standings</h3>
+    <table>
+      <thead><tr><th>#</th><th>Player</th><th>Pts</th><th>Wins</th><th>Losses</th><th>Trifectas</th><th>Dumbasses</th><th>Win %</th></tr></thead>
+      <tbody id="standings-body"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3>Points over time</h3>
+    <div class="chart-wrap"><canvas id="trend-chart"></canvas></div>
+  </div>
+</div>
+
+<div id="picks" class="section">
+  <div class="card">
+    <h3>Today's picks <span style="font-size:13px;color:#888;font-weight:400" id="picks-date"></span></h3>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:1.25rem">
+      <label class="field-label" style="margin:0;white-space:nowrap">Picking for:</label>
+      <select id="player-sel" style="width:auto">
+        <option value="eric">Eric</option>
+        <option value="claude">Claude</option>
+      </select>
+    </div>
+    <div id="legs-container"></div>
+    <div id="status-bar" class="status-bar"></div>
+    <div style="margin-top:1rem;display:flex;gap:10px;align-items:center">
+      <button class="btn btn-primary" onclick="savePicks()">Save picks</button>
+      <span id="save-status" style="font-size:13px;color:#666"></span>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Mark results</h3>
+    <div id="results-container"><p class="loading">Loading…</p></div>
+  </div>
+</div>
+
+<div id="history" class="section">
+  <div id="history-content"><p class="loading">Loading…</p></div>
+</div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCkfnEabXzc-AuGUJaQnvMkmwm4z3rh0HM",
+  authDomain: "tease-prototype.firebaseapp.com",
+  databaseURL: "https://tease-prototype-default-rtdb.firebaseio.com",
+  projectId: "tease-prototype",
+  storageBucket: "tease-prototype.firebasestorage.app",
+  messagingSenderId: "393389557248",
+  appId: "1:393389557238:web:0dffc35b96e9ec25fe33d7"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const PLAYERS = [
+  {id:'eric', name:'Eric', color:'#2563eb', bg:'#eff6ff'},
+  {id:'claude', name:'Claude', color:'#7c3aed', bg:'#f5f3ff'}
+];
+
+// Today's games — update this each day
+const TODAY_GAMES = [
+  {away:'HOU',home:'SEA',spread:-1.5,total:7.5,time:'1:10 PM'},
+  {away:'AZ', home:'BAL',spread:-1.5,total:8.5,time:'3:35 PM'},
+  {away:'WSH',home:'PIT',spread:-1.5,total:7.5,time:'3:40 PM'},
+  {away:'CHC',home:'PHI',spread:-1.5,total:8.0,time:'3:40 PM'},
+  {away:'LAA',home:'NYY',spread:-1.5,total:9.0,time:'4:05 PM'},
+  {away:'MIA',home:'ATL',spread:-1.5,total:8.5,time:'4:15 PM'},
+  {away:'BOS',home:'MIN',spread:-1.5,total:8.5,time:'4:40 PM'},
+  {away:'CLE',home:'STL',spread:-1.5,total:7.5,time:'4:45 PM'},
+  {away:'TEX',home:'ATH',spread:-1.5,total:8.0,time:'6:40 PM'},
+  {away:'NYM',home:'LAD',spread:-1.5,total:9.0,time:'7:10 PM'}
+];
+
+const TODAY = new Date().toISOString().split('T')[0];
+let state = {picks:{}, results:{}, days:[]};
+let tChart = null;
+
+// Firebase helpers
+async function fbSet(path, data){
+  await set(ref(db, path), data);
+}
+async function fbGet(path){
+  const snap = await get(ref(db, path));
+  return snap.exists() ? snap.val() : null;
+}
+
+// Boot
+async function boot(){
+  document.getElementById('today-label').textContent = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  document.getElementById('picks-date').textContent = '— ' + new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
+
+  try {
+    const saved = await fbGet('state');
+    if(saved) state = saved;
+    if(!state.days) state.days = [];
+    if(!state.picks) state.picks = {};
+    if(!state.results) state.results = {};
+    if(!state.days.includes(TODAY)) { state.days.push(TODAY); await saveState(); }
+    document.getElementById('conn-status').textContent = 'live';
+    document.getElementById('conn-status').className = 'conn-status conn-ok';
+  } catch(e) {
+    document.getElementById('conn-status').textContent = 'offline';
+    document.getElementById('conn-status').className = 'conn-status conn-err';
+  }
+
+  // Live sync
+  onValue(ref(db,'state'), snap => {
+    if(snap.exists()){
+      state = snap.val();
+      if(!state.days) state.days=[];
+      if(!state.picks) state.picks={};
+      if(!state.results) state.results={};
+      renderStandings();
+      renderResults();
+      renderHistory();
+    }
+  });
+
+  buildLegs();
+  renderStandings();
+  renderResults();
+  renderHistory();
+}
+
+async function saveState(){
+  try { await fbSet('state', state); } catch(e) { console.error(e); }
+}
+
+// Nav
+window.showSection = function(id, btn){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(btn) btn.classList.add('active');
+};
+
+// Lines
+function fmt(n){ return (n>0?'+':'')+n.toFixed(1); }
+
+function getSideOptions(gi, type){
+  const g = TODAY_GAMES[gi];
+  if(!g) return [];
+  if(type==='spread') return [
+    {value:'fav', label:`${g.home} -1.5 → ${fmt(0)}`},
+    {value:'dog', label:`${g.away} +1.5 → ${fmt(3)}`}
+  ];
+  return [
+    {value:'over',  label:`Over ${g.total} → Over ${(g.total-1.5).toFixed(1)}`},
+    {value:'under', label:`Under ${g.total} → Under ${(g.total+1.5).toFixed(1)}`}
+  ];
+}
+
+function getBetKey(gi, type, side){ return `${gi}-${type}-${side}`; }
+
+function getLegs(){
+  return [1,2,3].map(i=>({
+    gameIdx: document.getElementById('game-'+i)?.value===''?null:parseInt(document.getElementById('game-'+i)?.value),
+    type:    document.getElementById('type-'+i)?.value||'spread',
+    side:    document.getElementById('side-'+i)?.value||''
+  }));
+}
+
+function getDupeBetIndices(){
+  const legs = getLegs();
+  const keys = legs.map(l=>l.gameIdx!==null&&l.side ? getBetKey(l.gameIdx,l.type,l.side) : null);
+  const seen = new Set(), dupes = new Set();
+  keys.forEach((k,i)=>{ if(!k) return; if(seen.has(k)) dupes.add(i); else seen.add(k); });
+  keys.forEach((k,i)=>{ if(k && dupes.size) keys.forEach((k2,j)=>{ if(i!==j&&k===k2) dupes.add(i); }); });
+  return dupes;
+}
+
+function isTrifecta(legs){
+  const gi = legs.filter(l=>l.gameIdx!==null).map(l=>l.gameIdx);
+  return gi.length===3 && gi[0]===gi[1] && gi[1]===gi[2];
+}
+
+window.refreshSides = function(i){
+  const gi   = document.getElementById('game-'+i)?.value;
+  const type = document.getElementById('type-'+i)?.value;
+  const sel  = document.getElementById('side-'+i);
+  if(!sel) return;
+  if(!gi||gi===''){
+    sel.innerHTML = '<option value="">— select game first —</option>';
+  } else {
+    const opts = getSideOptions(parseInt(gi), type);
+    sel.innerHTML = opts.map(o=>`<option value="${o.value}">${o.label}</option>`).join('');
+  }
+  validateLegs();
+};
+
+window.validateLegs = function(){
+  const dupes = getDupeBetIndices();
+  const legs  = getLegs();
+  const allSet = legs.every(l=>l.gameIdx!==null && l.side);
+  [0,1,2].forEach(i=>{
+    const b = document.getElementById('leg-block-'+i);
+    if(b) b.className = 'leg-block'+(dupes.has(i)?' invalid':'');
+  });
+  const bar = document.getElementById('status-bar');
+  if(!bar) return;
+  if(dupes.size>0){
+    bar.className='status-bar show invalid';
+    bar.textContent='Duplicate bet — same game, type, and side on multiple legs.';
+  } else if(allSet && isTrifecta(legs)){
+    bar.className='status-bar show trifecta';
+    bar.textContent='Trifecta eligible — all 3 legs on the same game. +1.5 pts if all hit.';
+  } else if(allSet){
+    bar.className='status-bar show';
+    bar.textContent='Standard tease — 3 different bets. +1 pt if all hit, +0.5 if all miss.';
+  } else {
+    bar.className='status-bar';
+  }
+};
+
+function buildLegs(){
+  const c = document.getElementById('legs-container');
+  c.innerHTML = '';
+  [0,1,2].forEach(i=>{
+    const n = i+1;
+    const div = document.createElement('div');
+    div.className = 'leg-block';
+    div.id = 'leg-block-'+i;
+    div.innerHTML = `
+      <div class="leg-title">Leg ${n}</div>
+      <div class="leg-grid">
+        <div><label class="field-label">Game</label>
+        <select id="game-${n}" onchange="refreshSides(${n})">
+          <option value="">— pick a game —</option>
+          ${TODAY_GAMES.map((g,gi)=>`<option value="${gi}">${g.away} @ ${g.home} (${g.time})</option>`).join('')}
+        </select></div>
+        <div><label class="field-label">Bet type</label>
+        <select id="type-${n}" onchange="refreshSides(${n})">
+          <option value="spread">Run line</option>
+          <option value="total">Total</option>
+        </select></div>
+      </div>
+      <div><label class="field-label">Side</label>
+      <select id="side-${n}" onchange="validateLegs()">
+        <option value="">— select game first —</option>
+      </select></div>`;
+    c.appendChild(div);
+  });
+}
+
+function getLegDesc(leg){
+  if(leg.gameIdx===null||leg.gameIdx===undefined) return '';
+  const opts = getSideOptions(leg.gameIdx, leg.type);
+  const chosen = opts.find(o=>o.value===leg.side);
+  return chosen ? chosen.label : leg.side;
+}
+
+window.savePicks = async function(){
+  const player = document.getElementById('player-sel').value;
+  const legs   = getLegs();
+  const status = document.getElementById('save-status');
+  if(legs.some(l=>l.gameIdx===null||!l.side)){ status.textContent='Fill in all 3 legs first.'; return; }
+  if(getDupeBetIndices().size>0){ status.textContent='Fix duplicate bets first.'; return; }
+  if(!state.picks[TODAY]) state.picks[TODAY] = {};
+  state.picks[TODAY][player] = {legs, trifecta: isTrifecta(legs)};
+  await saveState();
+  status.textContent = 'Saved!';
+  setTimeout(()=>status.textContent='', 2000);
+  renderResults();
+};
+
+function renderResults(){
+  const c = document.getElementById('results-container');
+  let html = '';
+  PLAYERS.forEach(p=>{
+    const pick = (state.picks[TODAY]||{})[p.id];
+    const res  = (state.results[TODAY]||{})[p.id]||{hits:[null,null,null]};
+    html += `<div style="margin-bottom:1.25rem">
+      <div class="player-col" style="margin-bottom:8px">
+        <div class="avatar" style="background:${p.bg};color:${p.color}">${p.name[0]}</div>
+        <strong>${p.name}</strong>`;
+    if(!pick){ html += ` <span style="font-size:12px;color:#888">no picks yet</span></div></div>`; return; }
+    if(pick.trifecta) html += ` <span class="badge badge-trifecta">trifecta eligible</span>`;
+    html += `</div>`;
+    pick.legs.forEach((leg,i)=>{
+      const g   = TODAY_GAMES[leg.gameIdx];
+      if(!g) return;
+      const hit = res.hits[i];
+      html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:14px">
+        <span style="flex:1;color:#888;font-size:13px">${g.away}@${g.home}:</span>
+        <span style="flex:2">${getLegDesc(leg)}</span>
+        <button class="result-btn ${hit===true?'hit':''}" onclick="setResult('${p.id}',${i},true)">Hit</button>
+        <button class="result-btn ${hit===false?'miss':''}" onclick="setResult('${p.id}',${i},false)">Miss</button>
+        <button class="result-btn" onclick="setResult('${p.id}',${i},null)">—</button>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  c.innerHTML = html || '<p style="font-size:14px;color:#888">No picks entered yet.</p>';
+}
+
+window.setResult = async function(pid, li, val){
+  if(!state.results[TODAY]) state.results[TODAY] = {};
+  if(!state.results[TODAY][pid]) state.results[TODAY][pid] = {hits:[null,null,null]};
+  state.results[TODAY][pid].hits[li] = val;
+  await saveState();
+  renderResults();
+  renderStandings();
+};
+
+function computeScore(pid){
+  let pts=0,wins=0,losses=0,trifectas=0,dumbasses=0,byDay=[];
+  (state.days||[]).forEach(day=>{
+    const pick = (state.picks[day]||{})[pid];
+    const res  = (state.results[day]||{})[pid];
+    let dp = 0;
+    if(pick && res){
+      const hits = res.hits||[null,null,null];
+      if(hits.every(h=>h===true)){
+        dp = pick.trifecta?1.5:1; wins++;
+        if(pick.trifecta) trifectas++;
+      } else if(hits.every(h=>h===false)){
+        dp=0.5; losses++; dumbasses++;
+      } else if(hits.some(h=>h!==null)){
+        losses++;
+      }
+      pts = Math.round((pts+dp)*10)/10;
+    }
+    byDay.push(pts);
+  });
+  return{pts,wins,losses,trifectas,dumbasses,byDay};
+}
+
+function renderStandings(){
+  const scores = PLAYERS.map(p=>({...p,...computeScore(p.id)}));
+  scores.sort((a,b)=>b.pts-a.pts);
+  const leader=scores[0], other=scores[1];
+  const diff=Math.round((leader.pts-other.pts)*10)/10;
+  document.getElementById('metrics-row').innerHTML=`
+    <div class="metric"><div class="lbl">Leader</div><div class="val">${leader.name}</div><div class="sub">${leader.pts} pts</div></div>
+    <div class="metric"><div class="lbl">Margin</div><div class="val">${diff}</div><div class="sub">points ahead</div></div>
+    <div class="metric"><div class="lbl">Days played</div><div class="val">${(state.days||[]).length}</div><div class="sub">this season</div></div>`;
+  const tbody = document.getElementById('standings-body');
+  tbody.innerHTML='';
+  scores.forEach((p,i)=>{
+    const pct = p.wins+p.losses>0 ? Math.round(p.wins/(p.wins+p.losses)*100)+'%' : '—';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${i+1}</td>
+      <td><div class="player-col"><div class="avatar" style="background:${p.bg};color:${p.color}">${p.name[0]}</div>${p.name}</div></td>
+      <td><strong>${p.pts}</strong></td><td>${p.wins}</td><td>${p.losses}</td><td>${p.trifectas}</td><td>${p.dumbasses}</td><td>${pct}</td>`;
+    tbody.appendChild(tr);
+  });
+  const ctx = document.getElementById('trend-chart').getContext('2d');
+  if(tChart) tChart.destroy();
+  tChart = new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:(state.days||[]).map(d=>{const dt=new Date(d+'T12:00:00');return(dt.getMonth()+1)+'/'+dt.getDate();}),
+      datasets:PLAYERS.map(p=>{const s=computeScore(p.id);return{label:p.name,data:s.byDay,borderColor:p.color,backgroundColor:'transparent',borderWidth:2.5,tension:0.3,pointRadius:4,pointBackgroundColor:p.color};})
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{boxWidth:12,font:{size:13},padding:16}}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,0.06)'}},x:{grid:{display:false}}}}
+  });
+}
+
+function renderHistory(){
+  const c = document.getElementById('history-content');
+  const days = [...(state.days||[])].reverse();
+  if(!days.length){ c.innerHTML='<p style="font-size:14px;color:#888;padding:1rem 0">No history yet.</p>'; return; }
+  let html='';
+  days.forEach(day=>{
+    const dt=new Date(day+'T12:00:00');
+    const label=dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    html+=`<div class="card"><div style="font-size:14px;font-weight:600;margin-bottom:12px">${label}</div>`;
+    PLAYERS.forEach(p=>{
+      const pick=(state.picks[day]||{})[p.id];
+      const res=(state.results[day]||{})[p.id];
+      html+=`<div style="margin-bottom:12px">
+        <div class="player-col" style="margin-bottom:5px">
+          <div class="avatar" style="background:${p.bg};color:${p.color};width:22px;height:22px;font-size:11px">${p.name[0]}</div>
+          <span style="font-size:13px;font-weight:600">${p.name}</span>`;
+      if(!pick){ html+=` <span style="font-size:12px;color:#888">no picks</span></div></div>`; return; }
+      if(res){
+        const allHit=res.hits.every(h=>h===true);
+        const allMiss=res.hits.every(h=>h===false);
+        const anySet=res.hits.some(h=>h!==null);
+        if(allHit&&pick.trifecta)       html+=` <span class="badge badge-trifecta">trifecta +1.5</span>`;
+        else if(allHit)                 html+=` <span class="badge badge-win">win +1</span>`;
+        else if(allMiss)                html+=` <span class="badge badge-dumbass">dumbass +0.5</span>`;
+        else if(anySet)                 html+=` <span class="badge badge-loss">loss</span>`;
+      }
+      html+=`</div>`;
+      pick.legs.forEach((leg,i)=>{
+        const g=TODAY_GAMES[leg.gameIdx];
+        if(!g) return;
+        const hit=res?.hits?.[i];
+        const dc=hit===true?'dot-hit':hit===false?'dot-miss':'dot-pending';
+        html+=`<div class="pick-leg"><div class="dot ${dc}"></div><span>${g.away}@${g.home} — ${getLegDesc(leg)}</span></div>`;
+      });
+      html+=`</div>`;
+    });
+    html+=`</div>`;
+  });
+  c.innerHTML=html;
+}
+
+boot();
+</script>
+</body>
+</html>
